@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EShop - Товар</title>
+    <link rel="stylesheet" href="../static/product.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1 class="brand-blue">EShop</h1>
+            <div class="nav-links">
+                <a href="/">Главная</a>
+                {% if email %}
+                <a href="/profile">Профиль</a>
+                <a href="/logout">Выйти</a>
+                {% else %}
+                <a href="/login">Вход</a>
+                {% endif %}
+                <a href="/cart">Корзина</a>
+            </div>
+        </div>
+    </header>
+    <div class="product-container">
+        <img id="product-image" src="" alt="Изображение товара" class="product-image">
+        <div id="product-title" class="product-title">Загрузка...</div>
+        <div id="product-price" class="product-price"></div>
+        <div id="product-description" class="product-description"></div>
+        <div id="product-seller" class="product-seller"></div>
+        <button id="add-to-cart-btn" disabled>Проверка корзины...</button>
+        <div id="cart-message"></div>
+        <div id="seller-actions"></div>
+        <a href="http://localhost:8000/">Назад к товарам</a>
+    </div>
+
+    <script>
+        async function fetchProductInfo() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const productId = urlParams.get('id');
+                if (!productId) throw new Error('ID товара не указан в URL');
+
+                const productResponse = await fetch(`http://localhost:8003/api/get_product?id=${productId}`);
+                if (!productResponse.ok) throw new Error('Ошибка при загрузке данных о товаре');
+                const product = await productResponse.json();
+
+                const sellerResponse = await fetch(`http://localhost:8001/api/seller/${product.seller_id}`);
+                if (!sellerResponse.ok) throw new Error('Ошибка при загрузке данных о продавце');
+                const seller = await sellerResponse.json();
+
+                document.getElementById('product-image').src = product.image_url || 'https://www.iephb.ru/wp-content/uploads/2021/01/img-placeholder.png';
+                document.getElementById('product-title').textContent = product.name;
+                document.getElementById('product-price').textContent = `${product.price} ₽`;
+                document.getElementById('product-description').textContent = product.description;
+                document.getElementById('product-seller').textContent = `Продавец: ${seller.shop_name || 'N/A'}`;
+
+                await checkUserRoleAndCart(productId);
+                await checkIfSellerOwnsProduct(productId, product.seller_id);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                document.getElementById('product-title').textContent = 'Ошибка при загрузке данных о товаре';
+            }
+        }
+
+        async function checkIfSellerOwnsProduct(productId, productSellerId) {
+            const token = "{{ token }}";
+            if (!token) return;
+
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                const payload = JSON.parse(jsonPayload);
+                const email = payload.sub;
+
+                if (!email) {
+                    console.error("ERROR: Email not found in JWT payload.");
+                    return;
+                }
+
+                const userDetailsResponse = await fetch(`http://localhost:8001/profile?email=${email}`);
+                if (!userDetailsResponse.ok) {
+                    console.error('Ошибка при получении данных пользователя:', userDetailsResponse.statusText);
+                    return;
+                }
+                const userDetails = await userDetailsResponse.json();
+                const currentUserRole = userDetails.role;
+                const currentUserId = userDetails.id; 
+
+                if (currentUserRole === 'seller' && currentUserId === productSellerId) {
+                    const editButtonHtml = `<a href="/seller/edit_product?id=${productId}" class="edit-product-button">Изменить товар</a>`;
+                    const sellerActionsDiv = document.getElementById('seller-actions');
+                    if (sellerActionsDiv) {
+                        sellerActionsDiv.insertAdjacentHTML('beforeend', editButtonHtml);
+                    }
+                }
+                if (currentUserRole === 'admin') {
+                    const deleteButtonHtml = `<button class="admin-delete-btn" onclick="deleteProductAsAdmin(${productId})">Удалить товар (админ)</button>`;
+                    const sellerActionsDiv = document.getElementById('seller-actions');
+                    if (sellerActionsDiv) {
+                        sellerActionsDiv.insertAdjacentHTML('beforeend', deleteButtonHtml);
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка при проверке прав продавца:', error);
+            }
+        }
+
+        async function checkUserRoleAndCart(productId) {
+            try {
+                const addToCartBtn = document.getElementById('add-to-cart-btn');
+                const cartMessage = document.getElementById('cart-message');
+                const jwt_token = "{{ token }}";
+
+                if (!jwt_token) {
+                    addToCartBtn.disabled = true;
+                    addToCartBtn.textContent = 'Войдите, чтобы добавить в корзину';
+                    cartMessage.textContent = '';
+                    return;
+                }
+
+                let email = null;
+                try {
+                    const base64Url = jwt_token.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join(''));
+                    const payload = JSON.parse(jsonPayload);
+                    email = payload.sub;
+                } catch (e) {
+                    console.error("Ошибка при декодировании JWT:", e);
+                    addToCartBtn.disabled = true;
+                    addToCartBtn.textContent = 'Ошибка авторизации';
+                    return;
+                }
+
+                if (!email) {
+                    addToCartBtn.disabled = true;
+                    addToCartBtn.textContent = 'Ошибка авторизации';
+                    return;
+                }
+
+                const roleResponse = await fetch(`http://localhost:8001/role?email=${email}`);
+                if (!roleResponse.ok) {
+                    console.error('Ошибка при получении роли пользователя:', roleResponse.status, roleResponse.statusText);
+                    addToCartBtn.disabled = true;
+                    addToCartBtn.textContent = 'Ошибка роли';
+                    return;
+                }
+                const roleData = await roleResponse.json();
+                const userRole = roleData.role;
+
+                if (userRole === 'seller') {
+                    addToCartBtn.style.display = 'none';
+                    cartMessage.textContent = 'Продавцы не могут добавлять товары в корзину.';
+                    return;
+                }
+
+                const response = await fetch(`http://localhost:8004/check_cart?product_id=${productId}`, {
+                    headers: { 'Auth': `Bearer ${jwt_token}` }
+                });
+                if (!response.ok) throw new Error('Ошибка при проверке корзины');
+                const result = await response.json();
+
+                if (result.exists) {
+                    addToCartBtn.disabled = true;
+                    addToCartBtn.textContent = 'Товар в корзине';
+                    cartMessage.textContent = 'Этот товар уже находится в вашей корзине.';
+                } else {
+                    addToCartBtn.disabled = false;
+                    addToCartBtn.textContent = 'Добавить в корзину';
+                    addToCartBtn.onclick = () => addToCart(productId);
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                document.getElementById('cart-message').textContent = 'Ошибка при проверке корзины.';
+            }
+        }
+
+        async function addToCart(productId) {
+            try {
+                const token = "{{ token }}";
+                const response = await fetch(`http://localhost:8004/cart/add?product_id=${productId}`, {
+                    headers: { 'Auth': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Ошибка при добавлении товара в корзину');
+                const result = await response.json();
+
+                const cartMessage = document.getElementById('cart-message');
+                if (result.success) {
+                    document.getElementById('add-to-cart-btn').disabled = true;
+                    document.getElementById('add-to-cart-btn').textContent = 'Товар в корзине';
+                    cartMessage.textContent = 'Товар успешно добавлен в корзину!';
+                } else {
+                    cartMessage.textContent = 'Что-то пошло не так. Попробуйте ещё раз.';
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                document.getElementById('cart-message').textContent = 'Ошибка при добавлении товара в корзину.';
+            }
+        }
+
+        async function deleteProductAsAdmin(productId) {
+            if (!confirm('Вы уверены, что хотите удалить этот товар?')) return;
+            try {
+                const token = "{{ token }}";
+                const response = await fetch(`/admin/delete_product`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Auth': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ id: productId })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    alert(err.detail || 'Ошибка удаления товара');
+                } else {
+                    alert('Товар удалён');
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                alert('Ошибка удаления товара');
+            }
+        }
+
+        window.onload = fetchProductInfo;
+    </script>
+</body>
+</html>

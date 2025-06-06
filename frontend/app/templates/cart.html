@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EShop - Корзина</title>
+    <link rel="stylesheet" href="../static/cart.css">
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const email = "{{ email }}";
+            try {
+                const userIdResponse = await fetch(`http://localhost:8001/get_user_id?email=${email}`);
+                if (!userIdResponse.ok) throw new Error('Не удалось получить ID пользователя');
+                const { user_id } = await userIdResponse.json();
+
+                const cartResponse = await fetch(`http://localhost:8004/cart/${user_id}`);
+                if (!cartResponse.ok) throw new Error('Не удалось получить товары корзины');
+                const cartItems = await cartResponse.json();
+
+                for (const item of cartItems) {
+                    const productResponse = await fetch(`http://localhost:8003/api/get_product?id=${item.product_id}`);
+                    if (productResponse.ok) {
+                        const product = await productResponse.json();
+                        item.product_name = product.name;
+                        item.product_image = product.image_url || 'https://www.iephb.ru/wp-content/uploads/2021/01/img-placeholder.png';
+                        item.stock = product.stock;
+                    }
+                }
+
+                renderCart(cartItems);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                renderCart([]);
+            }
+        });
+
+        function renderCart(cartItems) {
+            const cartContainer = document.getElementById('cartContainer');
+            cartContainer.innerHTML = `
+                <header>
+                    <div class="header-content">
+                        <h1 class="brand-blue">EShop</h1>
+                        <div class="nav-links">
+                            <a href="/">Главная</a>
+                            <a href="/profile">Профиль</a>
+                            <a href="/logout">Выйти</a>
+                        </div>
+                    </div>
+                </header>
+                <div class="container">
+                    <div class="cart-info">
+                        <h1>Ваша корзина</h1>
+                    </div>
+                    <div class="items-grid">
+                        ${cartItems.length > 0 ? cartItems.map(item => `
+                            <div class="item-card">
+                                <img src="${item.product_image}" alt="${item.product_name}" class="product-image"/>
+                                <h3>${item.product_name}</h3>
+                                <div class="item-controls">
+                                    <div class="quantity-control">
+                                        <label>Количество:</label>
+                                        <input type="number" min="1" max="${item.stock}" value="${item.quantity}"
+                                            onblur="updateQuantity(${item.product_id}, this.value, ${item.stock})"
+                                            onkeydown="if(event.key==='Enter'){updateQuantity(${item.product_id}, this.value, ${item.stock})}">
+                                        <span>из ${item.stock}</span>
+                                    </div>
+                                    <button class="delete-button" onclick="deleteItem(${item.product_id})">Удалить</button>
+                                </div>
+                            </div>
+                        `).join('') : '<p class="empty-message">Ваша корзина пуста</p>'}
+                    </div>
+                </div>
+                ${cartItems.length > 0 ? `
+                    <div class="order-button">
+                        <button class="create-order-btn" onclick="createOrder()">Оформить заказ</button>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        async function deleteItem(productId) {
+            if (!confirm('Удалить товар из корзины?')) return;
+            try {
+                const token = "{{ token }}";
+                const response = await fetch(`http://localhost:8004/cart/delete?product_id=${productId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Auth': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (!response.ok) throw new Error('Ошибка при удалении товара');
+                location.reload();
+            } catch (error) {
+                console.error('Error deleting item:', error);
+                alert('Ошибка при удалении товара');
+            }
+        }
+
+        async function createOrder() {
+            try {
+                const token = "{{ token }}";
+                const response = await fetch(`http://localhost:8004/cart/createorder`, {
+                    method: 'GET',
+                    headers: {
+                        'Auth': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('Ошибка при создании заказа');
+                alert('Заказ успешно оформлен!');
+                location.reload();
+            } catch (error) {
+                console.error('Error creating order:', error);
+                alert('Ошибка при оформлении заказа');
+            }
+        }
+
+        async function updateQuantity(productId, newQuantity, maxStock) {
+            const token = "{{ token }}";
+            const email = "{{ email }}";
+            const userIdResponse = await fetch(`http://localhost:8001/get_user_id?email=${email}`);
+            if (!userIdResponse.ok) return alert('Ошибка получения user_id');
+            const { user_id } = await userIdResponse.json();
+            
+            if (newQuantity < 1 || newQuantity > maxStock) {
+                alert(`Количество должно быть от 1 до ${maxStock}`);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:8004/cart/${user_id}/${productId}?quantity=${newQuantity}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Auth': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    alert(err.detail || 'Ошибка обновления количества');
+                } else {
+                    location.reload();
+                }
+            } catch (error) {
+                alert('Ошибка обновления количества');
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="cartContainer"></div>
+</body>
+</html>

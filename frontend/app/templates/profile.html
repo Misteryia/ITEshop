@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EShop - Профиль</title>
+    <link rel="stylesheet" href="../static/profile.css">
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const email = "{{ email }}";
+            fetchProfileData(email);
+        });
+
+        async function fetchProfileData(email) {
+            try {
+                const response = await fetch(`http://localhost:8001/profile?email=${email}`);
+                if (!response.ok) throw new Error('Не удалось загрузить данные профиля');
+                const profileData = await response.json();
+                renderProfile(profileData);
+            } catch (error) {
+                console.error('Ошибка при загрузке данных профиля:', error);
+                document.getElementById('profileContainer').innerHTML = `
+                    <div class="error-message">
+                        <p>Ошибка загрузки данных профиля. Попробуйте снова позже.</p>
+                    </div>`;
+            }
+        }
+
+        function renderProfile(profileData) {
+            const profileContainer = document.getElementById('profileContainer');
+            if (profileData.role === 'admin') {
+                profileContainer.innerHTML = `
+                    <header>
+                        <div class="header-content">
+                            <h1 class="brand-blue">EShop</h1>
+                            <div class="nav-links">
+                                <a href="/">Главная</a>
+                                <a href="/logout">Выйти</a>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="profile-content">
+                        <div class="profile-info">
+                            <h1>Профиль администратора</h1>
+                            <div class="profile-details">
+                                <p><strong>Email:</strong> ${profileData.email}</p>
+                            </div>
+                        </div>
+                        <div class="profile-actions">
+                            <a href="http://localhost:3000/d/cenk6e5aaeqkgf/overview" class="action-button">Метрики</a>
+                            <a href="/admin/users" class="action-button">Пользователи</a>
+                            <a href="/admin/orders" class="action-button">Заказы</a>
+                        </div>
+                    </div>
+                `;
+            } else if (profileData.role === 'seller') {
+                const seller = profileData.seller_info || {};
+                profileContainer.innerHTML = `
+                    <header>
+                        <div class="header-content">
+                            <h1 class="brand-blue">EShop</h1>
+                            <div class="nav-links">
+                                <a href="/">Главная</a>
+                                <a href="/logout">Выйти</a>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="profile-content">
+                        <div class="profile-info">
+                            <h1>Профиль продавца</h1>
+                            <div class="profile-details">
+                                <p><strong>Email:</strong> ${profileData.email}</p>
+                                <p><strong>Магазин:</strong> ${seller.shop_name || '-'}</p>
+                                <p><strong>ИНН:</strong> ${seller.inn || '-'}</p>
+                                <p><strong>Описание:</strong> ${seller.description || '-'}</p>
+                            </div>
+                        </div>
+                        <div class="profile-actions">
+                            <a href="/profile/edit" class="action-button">Редактировать</a>
+                            <a href="/seller/add_product" class="action-button">Добавить товары</a>
+                            <a href="/seller/metr" class="action-button">Метрики</a>
+                        </div>
+                    </div>
+                `;
+            } else {
+                profileContainer.innerHTML = `
+                    <header>
+                        <div class="header-content">
+                            <h1 class="brand-blue">EShop</h1>
+                            <div class="nav-links">
+                                <a href="/">Главная</a>
+                                <a href="/logout">Выйти</a>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="profile-content">
+                        <div class="profile-info">
+                            <h1>Ваш профиль</h1>
+                            <div class="profile-details">
+                                <p><strong>Email:</strong> ${profileData.email}</p>
+                                <p><strong>Статус:</strong> ${profileData.is_active ? 'Активен' : 'Неактивен'}</p>
+                                <p><strong>Карта лояльности:</strong> ${profileData.loyalty_card_number || 'Нет'}</p>
+                            </div>
+                        </div>
+                        <div class="profile-actions">
+                            <a href="/profile/edit" class="action-button">Редактировать</a>
+                            <a href="/wishlist" class="action-button">Список желаемого</a>
+                            <a href="/orders" class="action-button">Заказы</a>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="profileContainer"></div>
+</body>
+</html>

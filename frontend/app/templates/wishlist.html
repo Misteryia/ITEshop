@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Список желаемого</title>
+    <link rel="stylesheet" href="../static/index.css">
+    <style>
+        .wishlist-container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .wishlist-item {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+        
+        .wishlist-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+        
+        .wishlist-item img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-right: 20px;
+        }
+        
+        .wishlist-info {
+            flex-grow: 1;
+        }
+        
+        .wishlist-info h3 {
+            margin: 0 0 5px 0;
+            color: #3498db;
+        }
+        
+        .wishlist-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .empty-wishlist {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+            font-size: 18px;
+        }
+        
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            text-decoration: none;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-secondary {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1 class="brand-blue">EShop</h1>
+            <div class="nav-links">
+                <a href="/">Главная</a>
+                <a href="/logout">Выйти</a>
+            </div>
+        </div>
+    </header>
+    <div class="container">
+        <div class="wishlist-container">
+            <h1 style="text-align: center; color: #3498db; margin-bottom: 25px;">Список желаемого</h1>
+            
+            <div id="wishlistItems">
+                {% if wishlist and wishlist|length > 0 %}
+                    {% for item in wishlist %}
+                    <div class="wishlist-item">
+                        <img src="{{ item.product_image or 'https://www.iephb.ru/wp-content/uploads/2021/01/img-placeholder.png' }}" alt="{{ item.product_name }}">
+                        <div class="wishlist-info">
+                            <h3>{{ item.product_name }}</h3>
+                        </div>
+                        <div class="wishlist-actions">
+                            <a href="/product?id={{ item.product_id }}" class="btn-primary">Посмотреть</a>
+                            <button onclick="removeFromWishlist({{ item.product_id }})" class="btn-secondary">Удалить</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-wishlist">
+                        Ваш список желаемого пуст.
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="/" class="btn-primary">На главную</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    async function removeFromWishlist(productId) {
+        if (confirm('Удалить товар из списка желаемого?')) {
+            try {
+                const token = "{{ token }}";
+                const response = await fetch(`/wishlist/remove?product_id=${productId}`, {
+                    headers: { 'Auth': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Ошибка при удалении товара');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Не удалось удалить товар');
+            }
+        }
+    }
+    </script>
+</body>
+</html>

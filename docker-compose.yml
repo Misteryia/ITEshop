@@ -1,0 +1,280 @@
+services:
+  frontend:
+    build:
+      context: .                
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - minio
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=eshop
+    ports:
+      - "8000:8000"
+    networks:
+      - mynetwork
+
+  auth:
+    build:
+      context: .               
+      dockerfile: auth/Dockerfile
+    ports:
+      - "8001:8001"
+    depends_on:
+      - auth_db
+      - kafka
+    environment:
+      - AUTH_DB_USER=auth_user
+      - AUTH_DB_PASSWORD=auth_pass
+      - AUTH_DB_NAME=auth_db
+      - AUTH_DB_HOST=auth_db
+      - AUTH_DB_PORT=5432
+    networks:
+      - mynetwork
+
+  catalog:
+    build:
+      context: .                
+      dockerfile: catalog/Dockerfile
+    ports:
+      - "8003:8003"
+    depends_on:
+      - catalog_db
+    environment:
+      - CATALOG_DB_USER=catalog_user
+      - CATALOG_DB_PASSWORD=catalog_pass
+      - CATALOG_DB_NAME=catalog_db
+      - CATALOG_DB_HOST=catalog_db
+      - CATALOG_DB_PORT=5432
+    networks:
+      - mynetwork
+
+  cart:
+    build:
+      context: .              
+      dockerfile: cart/Dockerfile
+    ports:
+      - "8004:8004"
+    depends_on:
+      - cart_db
+    environment:
+      - CART_DB_USER=cart_user
+      - CART_DB_PASSWORD=cart_pass
+      - CART_DB_NAME=cart_db
+      - CART_DB_HOST=cart_db
+      - CART_DB_PORT=5432
+    networks:
+      - mynetwork
+
+  monitoring:
+    build:
+      context: .               
+      dockerfile: monitoring/Dockerfile
+    ports:
+      - "8006:8006"
+    depends_on:
+      - elasticsearch
+      - kafka
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+    networks:
+      - mynetwork
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - KAFKA_BROKERS=kafka:9092
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - mynetwork
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      bash -c "apt-get update && apt-get install -y curl && /usr/local/bin/docker-entrypoint.sh"
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    networks:
+      - mynetwork
+    command: server /data --console-address ":9001"
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - mynetwork
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - mynetwork
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth_db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_pass
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - mynetwork
+
+  catalog_db:
+    image: postgres:latest
+    environment:
+        POSTGRES_USER: catalog_user
+        POSTGRES_PASSWORD: catalog_pass
+        POSTGRES_DB: catalog_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - catalog_db_data:/var/lib/postgresql/data
+    networks:
+      - mynetwork
+
+  cart_db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: cart_user
+      POSTGRES_PASSWORD: cart_pass
+      POSTGRES_DB: cart_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - cart_db_data:/var/lib/postgresql/data
+    networks:
+      - mynetwork
+      
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/app/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    networks:
+      - mynetwork
+    depends_on:
+      - monitoring
+      - auth
+      - catalog
+      - cart
+      - frontend
+    command:
+      - '--config.file=/etc/prometheus/config.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/app/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/app/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - mynetwork
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - mynetwork
+
+  elasticsearch_engine:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9201:9201"
+    volumes:
+      - ./catalog/synonyms.txt:/usr/share/elasticsearch/config/synonyms.txt
+    networks:
+      - mynetwork
+
+
+  kibana:
+    image: kibana:7.17.10
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - mynetwork
+        
+
+networks:
+  mynetwork:
+    driver: bridge
+
+volumes:
+  auth_db_data:
+  catalog_db_data: 
+  cart_db_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+  kafka_data:
+  minio_data:

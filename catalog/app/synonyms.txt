@@ -1,0 +1,52 @@
+телек,телевизор,tv,television
+смарт тв,smart tv
+oled,олэд
+qled,кьюлед
+4k,ultra hd
+8k,super ultra hd
+ноут,ноутбук,laptop,notebook
+ультрабук,ultrabook
+игровой,геймерский,gaming
+трансформер,convertible
+хромбук,chromebook
+телефон,смартфон,phone,smartphone
+андроид,android
+айфон,iphone
+флагман,flagship
+бюджетник,budget phone
+наушники,headphones
+вакуумные,вкладыши,earbuds
+беспроводные,bluetooth
+накладные,on-ear
+полноразмерные,over-ear
+гарнитура,headset
+фотоаппарат,камера,camera
+зеркалка,dslr
+беззеркалка,mirrorless
+компакт,compact
+экшен камера,action cam
+умная колонка,smart speaker
+видеоняня,baby monitor
+умная розетка,smart plug
+датчик,sensor
+хаб,контроллер,hub
+приставка,консоль,console
+стейминг,streaming box
+геймпад,джойстик,controller
+руль,steering wheel
+джойстик,joystick
+мультиварка,multi-cooker
+хлебопечка,bread maker
+йогуртница,yogurt maker
+соковыжималка,juicer
+кофемолка,coffee grinder
+кондей,кондиционер,ac
+обогреватель,heater
+увлажнитель,humidifier
+очиститель,air purifier
+вентилятор,fan
+дрель,drill
+шуруповерт,screwdriver
+лобзик,jigsaw
+перфоратор,hammer drill
+болгарка,angle grinder

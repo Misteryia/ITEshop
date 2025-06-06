@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EShop - Заказы</title>
+    <link rel="stylesheet" href="../static/orders.css">
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const email = "{{ email }}";
+            fetchOrdersData(email);
+        });
+
+        async function fetchOrdersData(email) {
+            try {
+                const response = await fetch(`http://localhost:8001/profile?email=${email}`);
+                if (!response.ok) throw new Error('Не удалось загрузить данные заказов');
+                const profileData = await response.json();
+
+                const updatedOrders = await Promise.all(profileData.orders.map(async (order) => {
+                    const updatedItems = await Promise.all(order.items.map(async (item) => {
+                        const productResponse = await fetch(`http://localhost:8003/api/get_product?id=${item.product_id}`);
+                        if (productResponse.ok) {
+                            const product = await productResponse.json();
+                            return {
+                                product_id: item.product_id,
+                                product_name: product.name,
+                                product_image: product.image_url || 'https://www.iephb.ru/wp-content/uploads/2021/01/img-placeholder.png',
+                                quantity: item.quantity
+                            };
+                        } else {
+                            return item;
+                        }
+                    }));
+
+                    return {
+                        ...order,
+                        items: updatedItems
+                    };
+                }));
+
+                renderOrders(updatedOrders);
+            } catch (error) {
+                console.error('Ошибка при загрузке данных заказов:', error);
+                const ordersContainer = document.getElementById('ordersContainer');
+                ordersContainer.innerHTML = `<p class="error-message">Ошибка загрузки данных заказов. Попробуйте снова позже.</p>`;
+            }
+        }
+
+        function renderOrders(ordersData) {
+            const ordersContainer = document.getElementById('ordersContainer');
+            ordersContainer.innerHTML = `
+                <header>
+                    <div class="header-content">
+                        <h1 class="brand-blue">EShop</h1>
+                        <div class="nav-links">
+                            <a href="/">Главная</a>
+                            <a href="/profile">Профиль</a>
+                            <a href="/logout">Выйти</a>
+                        </div>
+                    </div>
+                </header>
+                <div class="orders-content">
+                    <h1>Ваши заказы</h1>
+                    ${ordersData && ordersData.length > 0 ? `
+                        <div class="orders-list">
+                            ${ordersData.map(order => `
+                                <div class="order-card">
+                                    <div class="order-header">
+                                        <h3>Заказ #${order.order_id}</h3>
+                                        <span class="order-status">${getStatusText(order.status)}</span>
+                                    </div>
+                                    <p class="order-date">${new Date(order.order_date).toLocaleString()}</p>
+                                    <div class="order-items">
+                                        ${order.items.map(item => `
+                                            <div class="order-item">
+                                                <img src="${item.product_image}" alt="${item.product_name}" class="product-image"/>
+                                                <div class="item-details">
+                                                    <h4>${item.product_name}</h4>
+                                                    <p>Количество: ${item.quantity}</p>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <div class="order-total">
+                                        <strong>Итого:</strong> ${calculateOrderTotal(order.items)} ₽
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p class="empty-message">У вас пока нет заказов</p>'}
+                </div>
+            `;
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'pending': 'В обработке',
+                'delivered': 'Доставлен',
+                'cancelled': 'Отменен'
+            };
+            return statusMap[status] || status;
+        }
+
+        function calculateOrderTotal(items) {
+            return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+        }
+    </script>
+</head>
+<body>
+    <div id="ordersContainer"></div>
+</body>
+</html>

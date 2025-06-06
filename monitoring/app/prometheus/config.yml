@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'monitoring'
+    metrics_path: '/metr'
+    static_configs:
+      - targets: ['monitoring:8006']
+      
+  - job_name: 'auth'
+    metrics_path: '/metr'
+    static_configs:
+      - targets: ['auth:8001']
+
+  - job_name: 'catalog'
+    metrics_path: '/metr'
+    static_configs:
+      - targets: ['catalog:8003']
+
+  - job_name: 'cart'
+    metrics_path: '/metr'
+    static_configs:
+      - targets: ['cart:8004']
+
+  - job_name: 'frontend'
+    metrics_path: '/metr'
+    static_configs:
+      - targets: ['frontend:8000']

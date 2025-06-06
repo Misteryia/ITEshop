@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EShop - Регистрация</title>
+    <link rel="stylesheet" href="../static/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1 class="brand-blue">EShop</h1>
+            <div class="nav-links">
+                <a href="/">Главная</a>
+                <a href="/login">Вход</a>
+            </div>
+        </div>
+    </header>
+    <div class="auth-container">
+        <h1>Регистрация</h1>
+        <form class="auth-form" action="/register" method="POST">
+            <input type="text" name="email" placeholder="Электронная почта" required>
+            <input type="password" name="password" placeholder="Пароль" required>
+            <button type="submit">Зарегистрироваться</button>
+            {% if error %}
+                <div class="error-message">{{ error }}</div>
+            {% endif %}
+            {% if success %}
+                <div class="success-message">{{ success }}</div>
+            {% endif %}
+        </form>
+        <div class="auth-links">
+            <a href="/login">Вход</a>
+            <a href="/signup/seller">Регистрация продавца</a>
+            <a href="/">На главную</a>
+        </div>
+    </div>
+</body>
+</html>
